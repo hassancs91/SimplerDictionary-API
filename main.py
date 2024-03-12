@@ -1,6 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from typing import List
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
+auth_key = os.getenv("AUTH_KEY")
 
 app = FastAPI()
 
@@ -12,11 +17,12 @@ class DictionaryResponse(BaseModel):
     sentence: str
     images: List[str]
 
-@app.post("/lookup", response_model=DictionaryResponse)
-async def lookup_word(word: str):
-    # Here you would have logic to process the word, check for corrections, lookup meanings, sentences, and images
-    # For the sake of example, I'm returning some dummy data
 
+@app.post("/lookup", response_model=DictionaryResponse)
+async def lookup_word(word: str, api_key: str = Header(None)):
+    if api_key != auth_key:
+        raise HTTPException(status_code=401, detail="Invalid authentication key")
+ 
     # Dummy images URLs
     images = [
         "https://storage.freeaikit.com/ai-images/generated/st/2024/03/06b99eca-3658-4058-b246-eaf4bf0db92c.png",
