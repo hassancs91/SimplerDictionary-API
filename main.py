@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
+
 from pydantic import BaseModel
 from typing import List
 import os
@@ -9,6 +11,15 @@ auth_key = os.getenv("AUTH_KEY")
 
 app = FastAPI()
 
+# Add CORSMiddleware to allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
 class DictionaryResponse(BaseModel):
     user_input: str
     corrected_word: str
@@ -17,6 +28,10 @@ class DictionaryResponse(BaseModel):
     sentence: str
     images: List[str]
 
+
+@app.get("/health")
+async def health_check():
+    return {"status": "Healthy"}
 
 @app.post("/lookup", response_model=DictionaryResponse)
 async def lookup_word(word: str, api_key: str = Header(None)):
