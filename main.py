@@ -9,6 +9,15 @@ from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file
 auth_key = os.getenv("AUTH_KEY")
 
+from mongo import establish_connection, mongo_db_instance, get_database
+
+# implement NSFW Filter, word not suitable for children, skip
+# implement caching
+# implement auto correction for words
+# add not found in the UI with funny image
+# add detailed meaning collapsable in the frontend
+
+
 app = FastAPI()
 
 # Add CORSMiddleware to allow all origins
@@ -19,6 +28,25 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+
+
+@app.on_event("startup")
+async def startup():
+    try:
+        await establish_connection()
+    except Exception as ex:
+        pass
+        # record_log(ex,get_calling_module_name(),get_calling_function_name(), LogLevel.ERROR)
+
+
+@app.on_event("shutdown")
+async def shutdown():
+
+    try:
+        await mongo_db_instance.close()
+    except Exception as e:
+        pass
+
 
 class DictionaryResponse(BaseModel):
     user_input: str
@@ -33,24 +61,25 @@ class DictionaryResponse(BaseModel):
 async def health_check():
     return {"status": "Healthy"}
 
+
 @app.post("/lookup", response_model=DictionaryResponse)
 async def lookup_word(word: str, api_key: str = Header(None)):
     if api_key != auth_key:
         raise HTTPException(status_code=401, detail="Invalid authentication key")
- 
-    # Dummy images URLs
-    images = [
-        "https://storage.freeaikit.com/ai-images/generated/st/2024/03/06b99eca-3658-4058-b246-eaf4bf0db92c.png",
-        "https://storage.freeaikit.com/ai-images/generated/st/2024/03/a561fe73-5482-4371-9031-a9ce24563255.png",
-        "https://storage.freeaikit.com/ai-images/generated/st/2024/03/7389158e-9837-471d-816a-892538ac3a95.png"
-    ]
+
+    db = await get_database("simpler_dic")
+    cache_collection = db["words_collection"]
+
+    result = await cache_collection.find_one({"word": word})
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Word not found")
 
     return DictionaryResponse(
         user_input=word,
-        corrected_word=word, 
-        simple_meaning="water falling from clouds",
-        detailed_meaning="Rain, a form of precipitation, consists of water droplets falling from clouds.",
-        sentence="The sound of rain against the windows was soothing",
-        images=images
+        corrected_word=word,  # Assuming you handle word correction elsewhere if needed
+        simple_meaning=result["basic_meaning"],
+        detailed_meaning=result["detailed_meaning"],
+        sentence=result["sentence"],
+        images=result["picture_urls"],
     )
-
