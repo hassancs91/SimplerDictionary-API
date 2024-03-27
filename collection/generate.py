@@ -61,7 +61,9 @@ for input_word in words:
 
     Image_prompt_cartoon = f"photo of a {input_word}, , cartoon style"
     Image_prompt_3d = f"photo of a {input_word}, 3d pixar style"
-    Image_prompt_real = f"photo of a {input_word}, real style"
+    Image_prompt_real = (
+        f"photo that represents the following sentence: {sentence}, real style"
+    )
 
     image1 = stability_ai.generate_images(
         model_name="stable-diffusion-v1-6", prompt=Image_prompt_cartoon
@@ -88,6 +90,7 @@ for input_word in words:
         input_word, image_bytes3, "generated-images"
     )
 
+    # save datetime 0
     # save to mongo
     record_word_to_db(
         input_word,

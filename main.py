@@ -62,6 +62,11 @@ async def health_check():
     return {"status": "Healthy"}
 
 
+@app.get("/health-test")
+async def health_check():
+    return {"status": "Healthy"}
+
+
 @app.post("/lookup", response_model=DictionaryResponse)
 async def lookup_word(word: str, api_key: str = Header(None)):
     if api_key != auth_key:
@@ -70,6 +75,7 @@ async def lookup_word(word: str, api_key: str = Header(None)):
     db = await get_database("simpler_dic")
     cache_collection = db["words_collection"]
 
+    # get last recorded
     result = await cache_collection.find_one({"word": word})
 
     if not result:

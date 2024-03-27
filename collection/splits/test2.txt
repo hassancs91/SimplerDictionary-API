@@ -1,0 +1,9 @@
+hiss
+growl
+prey
+antelope
+boar
+tapirs
+warthogs
+leap
+leap a distance

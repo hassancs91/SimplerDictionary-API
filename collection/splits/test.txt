@@ -3,3 +3,5 @@ dog
 face
 leg
 smiling
+eyesight
+jump
