@@ -3,4 +3,4 @@ uvicorn
 python-dotenv
 motor
 simplerllm
-spellchecker
+pyspellchecker
