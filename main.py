@@ -1,21 +1,17 @@
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
-
 from pydantic import BaseModel
 from typing import List
 import os
 from dotenv import load_dotenv
+from pymongo import DESCENDING
+from spellchecker import SpellChecker
+
 
 load_dotenv()  # Load environment variables from .env file
 auth_key = os.getenv("AUTH_KEY")
 
 from mongo import establish_connection, mongo_db_instance, get_database
-
-# implement NSFW Filter, word not suitable for children, skip
-# implement caching
-# implement auto correction for words
-# add not found in the UI with funny image
-# add detailed meaning collapsable in the frontend
 
 
 app = FastAPI()
@@ -36,7 +32,6 @@ async def startup():
         await establish_connection()
     except Exception as ex:
         pass
-        # record_log(ex,get_calling_module_name(),get_calling_function_name(), LogLevel.ERROR)
 
 
 @app.on_event("shutdown")
@@ -62,9 +57,14 @@ async def health_check():
     return {"status": "Healthy"}
 
 
-@app.get("/health-test")
-async def health_check():
-    return {"status": "Healthy"}
+@app.post("/report-missing-word/")
+async def append_to_file(word: str):
+    try:
+        with open("missing_words.txt", "a", encoding="utf-8") as file:
+            file.write(word.lower() + "\n")
+        return {"message": "Word Added", "success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/lookup", response_model=DictionaryResponse)
@@ -75,15 +75,42 @@ async def lookup_word(word: str, api_key: str = Header(None)):
     db = await get_database("simpler_dic")
     cache_collection = db["words_collection"]
 
-    # get last recorded
-    result = await cache_collection.find_one({"word": word})
+    # Convert word to lowercase
+    original_word = word.lower()
 
+    # Check if the word exists
+    result = await cache_collection.find_one(
+        {"word": original_word}, sort=[("recorded_date", DESCENDING)]
+    )
+
+    # If the word is not found, try auto-correcting it
     if not result:
-        raise HTTPException(status_code=404, detail="Word not found")
+        spell = SpellChecker()
+        corrected_word = spell.correction(original_word)
+
+        # If the corrected word is different, search for it
+        if corrected_word != original_word:
+            result = await cache_collection.find_one(
+                {"word": corrected_word}, sort=[("recorded_date", DESCENDING)]
+            )
+
+            if not result:
+                raise HTTPException(status_code=404, detail="Word not found")
+
+            return DictionaryResponse(
+                user_input=original_word,
+                corrected_word=corrected_word,
+                simple_meaning=result["basic_meaning"],
+                detailed_meaning=result["detailed_meaning"],
+                sentence=result["sentence"],
+                images=result["picture_urls"],
+            )
+        else:
+            raise HTTPException(status_code=404, detail="Word not found")
 
     return DictionaryResponse(
-        user_input=word,
-        corrected_word=word,  # Assuming you handle word correction elsewhere if needed
+        user_input=original_word,
+        corrected_word=original_word,
         simple_meaning=result["basic_meaning"],
         detailed_meaning=result["detailed_meaning"],
         sentence=result["sentence"],
